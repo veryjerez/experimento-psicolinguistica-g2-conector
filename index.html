@@ -1,1 +1,215 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Language" content="es">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Experimento 1 – Grupo 2 (Con conector)</title>
+
+  <link rel="stylesheet" href="./lib/jspsych.css" />
+
+  <style>
+    :root{
+      --bg:#f6f7fb; --card:#ffffff; --text:#1f2937; --muted:#6b7280;
+      --border:#e5e7eb; --shadow: 0 10px 25px rgba(0,0,0,.08);
+      --radius: 18px; --btn:#111827; --btnText:#ffffff; --btnHover:#0b1220;
+    }
+    html, body { height: 100%; }
+    body{
+      margin:0; background: var(--bg); color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+    }
+    .jspsych-display-element{ padding: 24px 16px; }
+    .jspsych-content{ max-width: 920px; }
+    .jspsych-btn{
+      background: var(--btn); color: var(--btnText); border: 0;
+      border-radius: 14px; padding: 12px 18px; font-size: 1.05rem; font-weight: 600;
+      box-shadow: 0 8px 18px rgba(17,24,39,.15);
+    }
+    .jspsych-btn:hover{ background: var(--btnHover); }
+    input[type="text"]{
+      width: 100%; box-sizing: border-box; border: 1px solid var(--border);
+      border-radius: 12px; padding: 12px 14px; font-size: 1rem;
+    }
+    .wrap{ max-width: 860px; margin: 0 auto; }
+    .big{ font-size: 1.25rem; line-height: 1.65; }
+    .consigna{ text-align: left; font-size: 1.05rem; line-height: 1.6; }
+    .card{
+      background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 22px; box-shadow: var(--shadow);
+    }
+    .h-title{ font-size: 1.35rem; font-weight: 700; margin: 0 0 10px; }
+    .p-muted{ color: var(--muted); margin: 8px 0 0; font-size: 0.98rem; }
+    .hr confirms { height: 1px; background: var(--border); border: 0; margin: 14px 0; }
+    .hr{ height: 1px; background: var(--border); border: 0; margin: 14px 0; }
+    .probe-word{
+      font-size: 2.4rem; letter-spacing: 0.06em; font-weight: 800;
+      text-align: center; margin: 0;
+    }
+    .hint{ text-align:center; margin-top: 10px; color: var(--muted); font-size: 0.95rem; }
+  </style>
+</head>
+
+<body>
+
+  <script src="./lib/jspsych.js"></script>
+  <script src="./lib/plugin-survey-html-form.js"></script>
+  <script src="./lib/plugin-html-button-response.js"></script>
+
+  <script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxu0JFEj0AfFfuzH2-dxqj1qKCIzj_Mu_WQ5BL_dFnj7cBi87EFnSR34USmN6hBFF0/exec";
+
+    // IMPORTANTE: versión distinta para identificar el grupo
+    const EXP_VERSION = "exp1_con_conector_probe_v2";
+
+    // Grupo 2: conector en la segunda “oración/pantalla”
+    const SENTENCE_1 = "Juan salió de paseo con su familia";
+    const SENTENCE_2 = "porque el domingo estaba muy soleado.";
+
+    const PROBE_WORD = "SALIÓ";
+    const EXPECTED_PROBE_RESPONSE = "Sí";
+
+    const CONSIGNA_HTML = `
+      <div class="wrap card consigna">
+        <div class="h-title">Experimento 1</div>
+        <p>Se le presentarán dos oraciones, una a la vez, en la pantalla.</p>
+        <hr class="hr"/>
+        <ol>
+          <li>Lea la primera oración y presione “Siguiente”.</li>
+          <li>Lea la segunda oración y presione nuevamente “Siguiente”.</li>
+          <li>Inmediatamente después aparecerá una palabra.</li>
+          <li>Indique lo más rápido y preciso posible si esa palabra apareció en alguna de las oraciones anteriores.</li>
+        </ol>
+        <p><strong>No piense demasiado la respuesta.</strong></p>
+        <p><strong>Responda lo más rápido posible.</strong></p>
+      </div>
+    `;
+
+    function postDataToSheet(payload) {
+      return fetch(SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload)
+      });
+    }
+
+    function attachSNShortcuts() {
+      const handler = (ev) => {
+        const k = (ev.key || "").toLowerCase();
+        const btns = document.querySelectorAll("button.jspsych-btn");
+        if (k === "s" && btns[0]) btns[0].click();
+        if (k === "n" && btns[1]) btns[1].click();
+      };
+      document.addEventListener("keydown", handler);
+      return () => document.removeEventListener("keydown", handler);
+    }
+
+    const jsPsych = initJsPsych({
+      on_finish: async () => {
+        const nameTrial = jsPsych.data.get().filter({ trial_tag: "name" }).values()[0];
+        const name = nameTrial?.response?.name?.trim() ?? "";
+
+        const s1 = jsPsych.data.get().filter({ trial_tag: "sentence1" }).values()[0];
+        const s2 = jsPsych.data.get().filter({ trial_tag: "sentence2" }).values()[0];
+        const probe = jsPsych.data.get().filter({ trial_tag: "probe" }).values()[0];
+
+        const responseIndex = probe?.response; // 0=Sí, 1=No
+        const responseText = (responseIndex === 0) ? "Sí" : (responseIndex === 1) ? "No" : "";
+        const correct = (responseText === EXPECTED_PROBE_RESPONSE);
+
+        // Guardamos en columnas viejas del Sheet (como Grupo 1)
+        const payload = {
+          experiment_version: EXP_VERSION,
+          name,
+
+          sentence1_rt_ms: s1?.rt ?? "",
+          sentence2_rt_ms: s2?.rt ?? "",
+
+          question_rt_ms: probe?.rt ?? "",
+          response: responseText,
+          correct: correct,
+          keyword: PROBE_WORD,
+          question_text: `PALABRA: ${PROBE_WORD} | conector`,
+
+          sentence1_text: SENTENCE_1,
+          sentence2_text: SENTENCE_2
+        };
+
+        try { await postDataToSheet(payload); } catch (e) {}
+      }
+    });
+
+    const timeline = [];
+
+    timeline.push({
+      type: jsPsychSurveyHtmlForm,
+      preamble: `
+        <div class="wrap card">
+          <div class="h-title">Identificación</div>
+          <p class="p-muted">Por favor escriba su nombre.</p>
+        </div>
+      `,
+      html: `
+        <p style="margin-top:14px;">
+          <label>Nombre:<br>
+            <input name="name" type="text" required placeholder="Ej: Ana Pérez" />
+          </label>
+        </p>
+      `,
+      data: { trial_tag: "name" }
+    });
+
+    timeline.push({
+      type: jsPsychHtmlButtonResponse,
+      stimulus: CONSIGNA_HTML,
+      choices: ["Siguiente"],
+      data: { trial_tag: "consigna" }
+    });
+
+    timeline.push({
+      type: jsPsychHtmlButtonResponse,
+      stimulus: `<div class="wrap card big">${SENTENCE_1}</div>`,
+      choices: ["Siguiente"],
+      data: { trial_tag: "sentence1" }
+    });
+
+    timeline.push({
+      type: jsPsychHtmlButtonResponse,
+      stimulus: `<div class="wrap card big">${SENTENCE_2}</div>`,
+      choices: ["Siguiente"],
+      data: { trial_tag: "sentence2" }
+    });
+
+    timeline.push({
+      type: jsPsychHtmlButtonResponse,
+      stimulus: `
+        <div class="wrap card">
+          <p class="probe-word">${PROBE_WORD}</p>
+          <div class="hint">(En computadora: teclas S = Sí, N = No)</div>
+        </div>
+      `,
+      choices: ["Sí", "No"],
+      on_load: () => { window.__cleanupSN = attachSNShortcuts(); },
+      on_finish: () => { if (window.__cleanupSN) window.__cleanupSN(); },
+      data: { trial_tag: "probe" }
+    });
+
+    timeline.push({
+      type: jsPsychHtmlButtonResponse,
+      stimulus: `
+        <div class="wrap card">
+          <div class="h-title">Gracias</div>
+          <p class="p-muted">Su participación ha finalizado.</p>
+        </div>
+      `,
+      choices: ["Finalizar"],
+      data: { trial_tag: "end" }
+    });
+
+    jsPsych.run(timeline);
+  </script>
+
+</body>
+</html>
 
